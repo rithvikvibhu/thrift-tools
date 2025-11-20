@@ -6,12 +6,21 @@ import { decodeInput, detectFormat } from './utils/inputDecoder';
 import { ThriftParser } from './thrift/parser';
 import { ParseResult } from './thrift/types';
 import { useHashSyncedInput } from './hooks/useHashSyncedInput';
+import { useHorizontalSplit } from './hooks/useHorizontalSplit';
 
 function App() {
   const { inputValue, setInputValue, inputFormat, setInputFormat } =
     useHashSyncedInput('hex');
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [buffer, setBuffer] = useState<Uint8Array | null>(null);
+  const {
+    containerRef,
+    splitRatio,
+    leftWidth,
+    rightWidth,
+    isDragging,
+    startDragging,
+  } = useHorizontalSplit();
 
   const parseInput = useCallback(
     (value: string) => {
@@ -75,8 +84,13 @@ function App() {
         </div>
       </header>
 
-      <div className='flex-1 flex overflow-hidden'>
-        <div className='w-1/2'>
+      <div
+        ref={containerRef}
+        className={`flex-1 flex overflow-hidden ${
+          isDragging ? 'cursor-col-resize select-none' : ''
+        }`}
+      >
+        <div className='h-full' style={{ width: leftWidth }}>
           <InputPane
             value={inputValue}
             onChange={handleInputChange}
@@ -85,7 +99,17 @@ function App() {
             onParse={handleParse}
           />
         </div>
-        <div className='w-1/2'>
+        <div
+          className='w-1 bg-gray-300 cursor-col-resize hover:bg-gray-400 transition-colors'
+          onPointerDown={startDragging}
+          role='separator'
+          aria-label='Resize panes'
+          aria-valuenow={Math.round(splitRatio * 100)}
+          aria-valuemin={20}
+          aria-valuemax={80}
+          tabIndex={0}
+        />
+        <div className='h-full' style={{ width: rightWidth }}>
           <OutputPane result={parseResult} buffer={buffer} />
         </div>
       </div>

@@ -112,7 +112,7 @@ function TreeNode({
                 <ChevronRight className='w-4 h-4 text-gray-500' />
               ))}
           </span>
-          <span className='font-medium text-gray-800'>{label}</span>
+          <span className='font-medium text-gray-800 min-w-max'>{label}</span>
           {type && (
             <span
               className={`text-xs font-semibold ${typeColor} bg-gray-100 px-2 py-0.5 rounded`}
@@ -121,7 +121,7 @@ function TreeNode({
             </span>
           )}
           {value !== undefined && value !== null && (
-            <span className='text-gray-600 font-mono text-sm'>
+            <span className='text-gray-600 font-mono text-sm break-all'>
               ={' '}
               {typeof value === 'bigint'
                 ? value.toString()
