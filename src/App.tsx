@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Binary } from 'lucide-react';
 import { InputPane } from './components/InputPane';
 import { OutputPane } from './components/OutputPane';
-import { decodeInput } from './utils/inputDecoder';
+import { decodeInput, detectFormat } from './utils/inputDecoder';
 import { ThriftParser } from './thrift/parser';
 import { ParseResult } from './thrift/types';
 import { useHashSyncedInput } from './hooks/useHashSyncedInput';
@@ -13,8 +13,21 @@ function App() {
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [buffer, setBuffer] = useState<Uint8Array | null>(null);
 
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+    const detectedFormat = detectFormat(value);
+    if (detectedFormat !== inputFormat) {
+      setInputFormat(detectedFormat);
+    }
+  };
+
   const handleParse = () => {
-    const decodeResult = decodeInput(inputValue, inputFormat);
+    const detectedFormat = detectFormat(inputValue);
+    if (detectedFormat !== inputFormat) {
+      setInputFormat(detectedFormat);
+    }
+
+    const decodeResult = decodeInput(inputValue, detectedFormat);
 
     if (!decodeResult.success) {
       setParseResult({
@@ -52,7 +65,7 @@ function App() {
         <div className='w-1/2'>
           <InputPane
             value={inputValue}
-            onChange={setInputValue}
+            onChange={handleInputChange}
             format={inputFormat}
             onFormatChange={setInputFormat}
             onParse={handleParse}

@@ -77,10 +77,8 @@ export function detectFormat(input: string): InputFormat {
     return 'hex';
   }
 
-  const hasBase64Chars = /[A-Za-z+/=]/.test(cleaned);
-  const isValidHex = /^[0-9a-fA-F]+$/.test(cleaned);
-
-  if (isValidHex && !hasBase64Chars) {
+  const isHexOnly = /^[0-9a-fA-F]+$/.test(cleaned);
+  if (isHexOnly) {
     return 'hex';
   }
 
