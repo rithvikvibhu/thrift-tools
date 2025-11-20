@@ -5,6 +5,8 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <div style={{ isolation: 'isolate' }}>
+      <App />
+    </div>
   </StrictMode>
 );

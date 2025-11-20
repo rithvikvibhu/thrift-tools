@@ -77,7 +77,7 @@ export function OutputPane({ result, buffer }: OutputPaneProps) {
           </div>
           <div className='flex-1 overflow-auto'>
             {viewMode === 'tree' ? (
-              <TreeView data={result.data} />
+              <TreeView data={result.data} buffer={buffer} />
             ) : (
               buffer && (
                 <div className='p-4'>

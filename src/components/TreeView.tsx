@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ContextMenu } from '@base-ui-components/react/context-menu';
 import {
   ParsedStruct,
   ParsedList,
@@ -9,6 +10,16 @@ import {
   getTypeName,
 } from '../thrift/types';
 
+interface TreeContextValue {
+  buffer: Uint8Array | null;
+}
+
+const TreeContext = createContext<TreeContextValue>({ buffer: null });
+
+function useTreeContext() {
+  return useContext(TreeContext);
+}
+
 interface TreeNodeProps {
   label: string;
   value?: any;
@@ -17,6 +28,7 @@ interface TreeNodeProps {
   byteOffset?: number;
   byteLength?: number;
   defaultExpanded?: boolean;
+  isField?: boolean;
 }
 
 function TreeNode({
@@ -27,9 +39,24 @@ function TreeNode({
   byteOffset,
   byteLength,
   defaultExpanded = false,
+  isField = false,
 }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const hasChildren = children !== undefined && children !== null;
+  const { buffer } = useTreeContext();
+
+  const canCopyHex =
+    buffer && byteOffset !== undefined && byteLength !== undefined;
+  const valueString =
+    isField && value !== undefined && value !== null
+      ? formatValueAsString(value)
+      : null;
+  const valueHex =
+    isField && value !== undefined && value !== null
+      ? formatValueAsHex(value)
+      : null;
+  const hasMenu = Boolean(canCopyHex || valueHex || valueString);
+  const showValueActions = Boolean(valueHex || valueString);
 
   const typeColors: { [key: string]: string } = {
     BOOL: 'text-purple-600',
@@ -50,46 +77,103 @@ function TreeNode({
     ? typeColors[type] || 'text-gray-600'
     : 'text-gray-600';
 
+  const copyBytesAsHex = () => {
+    if (!canCopyHex || !buffer) {
+      return;
+    }
+    const slice = buffer.slice(byteOffset!, byteOffset! + byteLength!);
+    copyText(bytesToHex(slice));
+  };
+
+  const copyValueHex = () => {
+    if (valueHex) {
+      copyText(valueHex);
+    }
+  };
+
+  const copyValueString = () => {
+    if (valueString) {
+      copyText(valueString);
+    }
+  };
+
   return (
-    <div className='select-none'>
-      <div
-        className='flex items-center gap-2 py-1 hover:bg-gray-50 rounded px-2 cursor-pointer group'
-        onClick={() => hasChildren && setExpanded(!expanded)}
-      >
-        <span className='flex-shrink-0 w-4'>
-          {hasChildren &&
-            (expanded ? (
-              <ChevronDown className='w-4 h-4 text-gray-500' />
-            ) : (
-              <ChevronRight className='w-4 h-4 text-gray-500' />
-            ))}
-        </span>
-        <span className='font-medium text-gray-800'>{label}</span>
-        {type && (
-          <span
-            className={`text-xs font-semibold ${typeColor} bg-gray-100 px-2 py-0.5 rounded`}
-          >
-            {type}
+    <ContextMenu.Root>
+      <div className='select-none'>
+        <ContextMenu.Trigger
+          className='flex items-center gap-2 py-1 hover:bg-gray-50 rounded px-2 cursor-pointer group'
+          onClick={() => hasChildren && setExpanded(!expanded)}
+        >
+          <span className='flex-shrink-0 w-4'>
+            {hasChildren &&
+              (expanded ? (
+                <ChevronDown className='w-4 h-4 text-gray-500' />
+              ) : (
+                <ChevronRight className='w-4 h-4 text-gray-500' />
+              ))}
           </span>
-        )}
-        {value !== undefined && value !== null && (
-          <span className='text-gray-600 font-mono text-sm'>
-            ={' '}
-            {typeof value === 'bigint'
-              ? value.toString()
-              : JSON.stringify(value)}
-          </span>
-        )}
-        {byteOffset !== undefined && (
-          <span className='ml-auto text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity'>
-            @{byteOffset} ({byteLength} bytes)
-          </span>
+          <span className='font-medium text-gray-800'>{label}</span>
+          {type && (
+            <span
+              className={`text-xs font-semibold ${typeColor} bg-gray-100 px-2 py-0.5 rounded`}
+            >
+              {type}
+            </span>
+          )}
+          {value !== undefined && value !== null && (
+            <span className='text-gray-600 font-mono text-sm'>
+              ={' '}
+              {typeof value === 'bigint'
+                ? value.toString()
+                : JSON.stringify(value)}
+            </span>
+          )}
+          {byteOffset !== undefined && (
+            <span className='ml-auto text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity'>
+              @{byteOffset} ({byteLength} bytes)
+            </span>
+          )}
+        </ContextMenu.Trigger>
+        {hasChildren && expanded && (
+          <div className='ml-6 border-l border-gray-200 pl-2'>{children}</div>
         )}
       </div>
-      {hasChildren && expanded && (
-        <div className='ml-6 border-l border-gray-200 pl-2'>{children}</div>
+      {hasMenu && (
+        <ContextMenu.Portal>
+          <ContextMenu.Positioner className='outline-none'>
+            <ContextMenu.Popup className='origin-[var(--transform-origin)] rounded-md bg-[canvas] py-1 text-gray-900 shadow-lg shadow-gray-200 outline outline-1 outline-gray-200 transition-[opacity] data-[ending-style]:opacity-0 dark:shadow-none dark:-outline-offset-1 dark:outline-gray-300'>
+              {canCopyHex && (
+                <ContextMenu.Item
+                  className='flex cursor-default py-2 pr-8 pl-4 text-sm leading-4 outline-none select-none data-[highlighted]:relative data-[highlighted]:z-0 data-[highlighted]:text-gray-50 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:z-[-1] data-[highlighted]:before:rounded-sm data-[highlighted]:before:bg-gray-900'
+                  onClick={copyBytesAsHex}
+                >
+                  Copy bytes as hex
+                </ContextMenu.Item>
+              )}
+              {canCopyHex && showValueActions && (
+                <ContextMenu.Separator className='mx-4 my-1.5 h-px bg-gray-200' />
+              )}
+              {valueHex && (
+                <ContextMenu.Item
+                  className='flex cursor-default py-2 pr-8 pl-4 text-sm leading-4 outline-none select-none data-[highlighted]:relative data-[highlighted]:z-0 data-[highlighted]:text-gray-50 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:z-[-1] data-[highlighted]:before:rounded-sm data-[highlighted]:before:bg-gray-900'
+                  onClick={copyValueHex}
+                >
+                  Copy value as hex
+                </ContextMenu.Item>
+              )}
+              {valueString && (
+                <ContextMenu.Item
+                  className='flex cursor-default py-2 pr-8 pl-4 text-sm leading-4 outline-none select-none data-[highlighted]:relative data-[highlighted]:z-0 data-[highlighted]:text-gray-50 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:z-[-1] data-[highlighted]:before:rounded-sm data-[highlighted]:before:bg-gray-900'
+                  onClick={copyValueString}
+                >
+                  Copy value as string
+                </ContextMenu.Item>
+              )}
+            </ContextMenu.Popup>
+          </ContextMenu.Positioner>
+        </ContextMenu.Portal>
       )}
-    </div>
+    </ContextMenu.Root>
   );
 }
 
@@ -134,6 +218,7 @@ function renderStruct(struct: ParsedStruct, index?: number): React.ReactNode {
           byteOffset={field.byteOffset}
           byteLength={field.byteLength}
           defaultExpanded={true}
+          isField={true}
         >
           {renderValue(field.value)}
         </TreeNode>
@@ -277,24 +362,108 @@ function renderMessage(message: ParsedMessage): React.ReactNode {
 
 interface TreeViewProps {
   data: any;
+  buffer?: Uint8Array | null;
 }
 
-export function TreeView({ data }: TreeViewProps) {
+export function TreeView({ data, buffer }: TreeViewProps) {
   if (!data) {
     return null;
   }
 
-  if (data.type === 'message') {
-    return <div className='p-4'>{renderMessage(data as ParsedMessage)}</div>;
-  }
+  let content: React.ReactNode = null;
 
-  if (data.type === 'struct') {
-    return <div className='p-4'>{renderStruct(data as ParsedStruct)}</div>;
+  if (data.type === 'message') {
+    content = <div className='p-4'>{renderMessage(data as ParsedMessage)}</div>;
+  } else if (data.type === 'struct') {
+    content = <div className='p-4'>{renderStruct(data as ParsedStruct)}</div>;
+  } else {
+    content = (
+      <div className='p-4'>
+        <div className='text-sm text-gray-500'>Unsupported data type</div>
+      </div>
+    );
   }
 
   return (
-    <div className='p-4'>
-      <div className='text-sm text-gray-500'>Unsupported data type</div>
-    </div>
+    <TreeContext.Provider value={{ buffer: buffer ?? null }}>
+      {content}
+    </TreeContext.Provider>
   );
+}
+
+const textEncoder = new TextEncoder();
+
+function bytesToHex(bytes: ArrayLike<number>): string {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function formatValueAsString(value: any): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  return String(value);
+}
+
+function formatValueAsHex(value: any): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      return null;
+    }
+    return value.toString(16);
+  }
+
+  if (typeof value === 'bigint') {
+    return value.toString(16);
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? '01' : '00';
+  }
+
+  if (typeof value === 'string') {
+    return bytesToHex(textEncoder.encode(value));
+  }
+
+  if (value instanceof Uint8Array) {
+    return bytesToHex(value);
+  }
+
+  try {
+    return bytesToHex(textEncoder.encode(JSON.stringify(value)));
+  } catch {
+    return null;
+  }
+}
+
+function copyText(text: string) {
+  if (!navigator?.clipboard) {
+    return;
+  }
+
+  navigator.clipboard.writeText(text).catch((error) => {
+    console.error('Failed to copy text', error);
+  });
 }
