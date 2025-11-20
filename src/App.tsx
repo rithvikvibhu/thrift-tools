@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Binary } from 'lucide-react';
 import { InputPane } from './components/InputPane';
 import { OutputPane } from './components/OutputPane';
-import { InputFormat, decodeInput } from './utils/inputDecoder';
+import { decodeInput } from './utils/inputDecoder';
 import { ThriftParser } from './thrift/parser';
 import { ParseResult } from './thrift/types';
+import { useHashSyncedInput } from './hooks/useHashSyncedInput';
 
 function App() {
-  const [inputValue, setInputValue] = useState('');
-  const [inputFormat, setInputFormat] = useState<InputFormat>('hex');
+  const { inputValue, setInputValue, inputFormat, setInputFormat } =
+    useHashSyncedInput('hex');
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [buffer, setBuffer] = useState<Uint8Array | null>(null);
 
