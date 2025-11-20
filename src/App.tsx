@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Binary } from 'lucide-react';
 import { InputPane } from './components/InputPane';
 import { OutputPane } from './components/OutputPane';
@@ -13,39 +13,53 @@ function App() {
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [buffer, setBuffer] = useState<Uint8Array | null>(null);
 
+  const parseInput = useCallback(
+    (value: string) => {
+      if (!value.trim()) {
+        setParseResult(null);
+        setBuffer(null);
+        return;
+      }
+
+      const detectedFormat = detectFormat(value);
+      if (detectedFormat !== inputFormat) {
+        setInputFormat(detectedFormat);
+      }
+
+      const decodeResult = decodeInput(value, detectedFormat);
+
+      if (!decodeResult.success) {
+        setParseResult({
+          success: false,
+          error: decodeResult.error || 'Failed to decode input',
+          totalBytes: 0,
+        });
+        setBuffer(null);
+        return;
+      }
+
+      const parsedBuffer = decodeResult.buffer!;
+      setBuffer(parsedBuffer);
+
+      const parser = new ThriftParser(parsedBuffer);
+      const result = parser.parse();
+      setParseResult(result);
+    },
+    [inputFormat, setInputFormat]
+  );
+
   const handleInputChange = (value: string) => {
     setInputValue(value);
-    const detectedFormat = detectFormat(value);
-    if (detectedFormat !== inputFormat) {
-      setInputFormat(detectedFormat);
-    }
+    parseInput(value);
   };
 
   const handleParse = () => {
-    const detectedFormat = detectFormat(inputValue);
-    if (detectedFormat !== inputFormat) {
-      setInputFormat(detectedFormat);
-    }
-
-    const decodeResult = decodeInput(inputValue, detectedFormat);
-
-    if (!decodeResult.success) {
-      setParseResult({
-        success: false,
-        error: decodeResult.error || 'Failed to decode input',
-        totalBytes: 0,
-      });
-      setBuffer(null);
-      return;
-    }
-
-    const parsedBuffer = decodeResult.buffer!;
-    setBuffer(parsedBuffer);
-
-    const parser = new ThriftParser(parsedBuffer);
-    const result = parser.parse();
-    setParseResult(result);
+    parseInput(inputValue);
   };
+
+  useEffect(() => {
+    parseInput(inputValue);
+  }, [inputValue, parseInput]);
 
   return (
     <div className='flex flex-col h-screen bg-gray-100'>
