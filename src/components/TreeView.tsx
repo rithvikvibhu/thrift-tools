@@ -9,6 +9,7 @@ import {
   ParsedMessage,
   getTypeName,
 } from '../thrift/types';
+import { MatchedStruct, MatchedFieldDetail } from '../thrift/idlSchema';
 
 interface TreeContextValue {
   buffer: Uint8Array | null;
@@ -177,11 +178,15 @@ function TreeNode({
   );
 }
 
-function renderValue(value: any, index?: number): React.ReactNode {
+function renderValue(
+  value: any,
+  match?: MatchedStruct | null,
+  index?: number
+): React.ReactNode {
   if (value && typeof value === 'object') {
     if ('type' in value) {
       if (value.type === 'struct') {
-        return renderStruct(value as ParsedStruct, index);
+        return renderStruct(value as ParsedStruct, match ?? undefined, index);
       } else if (value.type === 'list') {
         return renderList(value as ParsedList, index);
       } else if (value.type === 'set') {
@@ -194,8 +199,16 @@ function renderValue(value: any, index?: number): React.ReactNode {
   return null;
 }
 
-function renderStruct(struct: ParsedStruct, index?: number): React.ReactNode {
-  const label = index !== undefined ? `[${index}]` : 'Struct';
+function renderStruct(
+  struct: ParsedStruct,
+  match?: MatchedStruct | null,
+  index?: number
+): React.ReactNode {
+  const baseLabel = index !== undefined ? `[${index}]` : 'Struct';
+  const label =
+    match && match.structName && index === undefined
+      ? `${baseLabel} (${match.structName})`
+      : baseLabel;
 
   return (
     <TreeNode
@@ -205,24 +218,47 @@ function renderStruct(struct: ParsedStruct, index?: number): React.ReactNode {
       byteLength={struct.byteLength}
       defaultExpanded={true}
     >
-      {struct.fields.map((field, idx) => (
-        <TreeNode
-          key={idx}
-          label={`Field ${field.fieldId}`}
-          type={field.typeName}
-          value={
-            typeof field.value === 'object' && field.value?.type
-              ? undefined
-              : field.value
-          }
-          byteOffset={field.byteOffset}
-          byteLength={field.byteLength}
-          defaultExpanded={true}
-          isField={true}
-        >
-          {renderValue(field.value)}
-        </TreeNode>
-      ))}
+      {struct.fields.map((field, idx) => {
+        const fieldMatch: MatchedFieldDetail | undefined =
+          match?.fields[field.fieldId];
+        const fieldLabel = fieldMatch?.fieldName
+          ? `Field ${field.fieldId} • ${fieldMatch.fieldName}`
+          : `Field ${field.fieldId}`;
+        const expectedType = fieldMatch?.expectedTypeLabel;
+        const expectedUpper = expectedType?.toUpperCase();
+        const typeBadge =
+          expectedUpper && expectedUpper !== field.typeName
+            ? `${field.typeName}→${expectedType}`
+            : field.typeName;
+        const childContent = renderValue(
+          field.value,
+          fieldMatch?.nestedMatch ?? null
+        );
+
+        return (
+          <TreeNode
+            key={idx}
+            label={fieldLabel}
+            type={typeBadge}
+            value={
+              typeof field.value === 'object' && field.value?.type
+                ? undefined
+                : field.value
+            }
+            byteOffset={field.byteOffset}
+            byteLength={field.byteLength}
+            defaultExpanded={true}
+            isField={true}
+          >
+            {!fieldMatch?.typeMatch && expectedType && (
+              <div className='text-xs text-amber-600 mb-1'>
+                Expected {expectedType}
+              </div>
+            )}
+            {childContent}
+          </TreeNode>
+        );
+      })}
       {struct.fields.length === 0 && (
         <div className='text-sm text-gray-400 italic py-1 px-2'>
           Empty struct
@@ -244,7 +280,7 @@ function renderList(list: ParsedList, index?: number): React.ReactNode {
       defaultExpanded={true}
     >
       {list.elements.map((element, idx) => {
-        const elementValue = renderValue(element, idx);
+        const elementValue = renderValue(element, undefined, idx);
         if (elementValue) {
           return <div key={idx}>{elementValue}</div>;
         }
@@ -273,7 +309,7 @@ function renderSet(set: ParsedSet, index?: number): React.ReactNode {
       defaultExpanded={true}
     >
       {set.elements.map((element, idx) => {
-        const elementValue = renderValue(element, idx);
+        const elementValue = renderValue(element, undefined, idx);
         if (elementValue) {
           return <div key={idx}>{elementValue}</div>;
         }
@@ -306,7 +342,7 @@ function renderMap(map: ParsedMap, index?: number): React.ReactNode {
           typeof entry.key === 'bigint'
             ? entry.key.toString()
             : JSON.stringify(entry.key);
-        const valueNode = renderValue(entry.value, idx);
+        const valueNode = renderValue(entry.value, undefined, idx);
 
         if (valueNode) {
           return (
@@ -329,7 +365,10 @@ function renderMap(map: ParsedMap, index?: number): React.ReactNode {
   );
 }
 
-function renderMessage(message: ParsedMessage): React.ReactNode {
+function renderMessage(
+  message: ParsedMessage,
+  match?: MatchedStruct | null
+): React.ReactNode {
   const messageTypeNames: { [key: number]: string } = {
     1: 'CALL',
     2: 'REPLY',
@@ -353,7 +392,7 @@ function renderMessage(message: ParsedMessage): React.ReactNode {
       <TreeNode label='Sequence ID' value={message.sequenceId} />
       {message.body && (
         <TreeNode label='Body' defaultExpanded={true}>
-          {renderStruct(message.body)}
+          {renderStruct(message.body, match ?? undefined)}
         </TreeNode>
       )}
     </TreeNode>
@@ -363,9 +402,10 @@ function renderMessage(message: ParsedMessage): React.ReactNode {
 interface TreeViewProps {
   data: any;
   buffer?: Uint8Array | null;
+  schemaMatch?: MatchedStruct | null;
 }
 
-export function TreeView({ data, buffer }: TreeViewProps) {
+export function TreeView({ data, buffer, schemaMatch }: TreeViewProps) {
   if (!data) {
     return null;
   }
@@ -373,9 +413,17 @@ export function TreeView({ data, buffer }: TreeViewProps) {
   let content: React.ReactNode = null;
 
   if (data.type === 'message') {
-    content = <div className='p-4'>{renderMessage(data as ParsedMessage)}</div>;
+    content = (
+      <div className='p-4'>
+        {renderMessage(data as ParsedMessage, schemaMatch ?? undefined)}
+      </div>
+    );
   } else if (data.type === 'struct') {
-    content = <div className='p-4'>{renderStruct(data as ParsedStruct)}</div>;
+    content = (
+      <div className='p-4'>
+        {renderStruct(data as ParsedStruct, schemaMatch ?? undefined)}
+      </div>
+    );
   } else {
     content = (
       <div className='p-4'>

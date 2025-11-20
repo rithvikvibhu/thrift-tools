@@ -4,15 +4,29 @@ import { InputPane } from './components/InputPane';
 import { OutputPane } from './components/OutputPane';
 import { decodeInput, detectFormat } from './utils/inputDecoder';
 import { ThriftParser } from './thrift/parser';
-import { ParseResult } from './thrift/types';
+import { ParseResult, ParsedStruct, ParsedMessage } from './thrift/types';
 import { useHashSyncedInput } from './hooks/useHashSyncedInput';
 import { useHorizontalSplit } from './hooks/useHorizontalSplit';
+import { IdlPayload } from './components/IdlLoader';
+import {
+  IdlSchema,
+  parseIdlSchema,
+  matchParseResultToSchema,
+  IdlMatchResult,
+} from './thrift/idlSchema';
+
+const IDL_STORAGE_KEY = 'thrift-tools:idl';
 
 function App() {
   const { inputValue, setInputValue, inputFormat, setInputFormat } =
     useHashSyncedInput('hex');
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [buffer, setBuffer] = useState<Uint8Array | null>(null);
+  const [idlSource, setIdlSource] = useState<IdlPayload | null>(null);
+  const [idlError, setIdlError] = useState<string | null>(null);
+  const [idlSchema, setIdlSchema] = useState<IdlSchema | null>(null);
+  const [useIdl, setUseIdl] = useState<boolean>(false);
+  const [idlMatch, setIdlMatch] = useState<IdlMatchResult | null>(null);
   const {
     containerRef,
     splitRatio,
@@ -62,13 +76,106 @@ function App() {
     parseInput(value);
   };
 
-  const handleParse = () => {
-    parseInput(inputValue);
-  };
+  const applyIdlPayload = useCallback((payload: IdlPayload | null) => {
+    if (!payload) {
+      setIdlSource(null);
+      setIdlSchema(null);
+      setUseIdl(false);
+      setIdlMatch(null);
+      setIdlError(null);
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.removeItem(IDL_STORAGE_KEY);
+        } catch (error) {
+          console.warn('Failed to clear stored IDL', error);
+        }
+      }
+      return;
+    }
+
+    setIdlSource(payload);
+    const parsed = parseIdlSchema(payload.content);
+    if (parsed.success) {
+      setIdlSchema(parsed.schema);
+      setUseIdl(true);
+      setIdlError(null);
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(IDL_STORAGE_KEY, JSON.stringify(payload));
+        } catch (error) {
+          console.warn('Failed to persist IDL', error);
+        }
+      }
+    } else {
+      setIdlSchema(null);
+      setUseIdl(false);
+      setIdlMatch(null);
+      setIdlError(parsed.error);
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.removeItem(IDL_STORAGE_KEY);
+        } catch (error) {
+          console.warn('Failed to clear stored IDL', error);
+        }
+      }
+    }
+  }, []);
+
+  const handleIdlLoad = useCallback(
+    (payload: IdlPayload) => {
+      applyIdlPayload(payload);
+    },
+    [applyIdlPayload]
+  );
+
+  const handleIdlClear = useCallback(() => {
+    applyIdlPayload(null);
+  }, [applyIdlPayload]);
 
   useEffect(() => {
     parseInput(inputValue);
   }, [inputValue, parseInput]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const stored = window.localStorage.getItem(IDL_STORAGE_KEY);
+    if (!stored) {
+      return;
+    }
+    try {
+      const payload = JSON.parse(stored) as IdlPayload;
+      if (payload?.content) {
+        applyIdlPayload(payload);
+      }
+    } catch (error) {
+      console.warn('Failed to load stored IDL', error);
+      window.localStorage.removeItem(IDL_STORAGE_KEY);
+    }
+  }, [applyIdlPayload]);
+
+  useEffect(() => {
+    if (
+      !useIdl ||
+      !idlSchema ||
+      !parseResult ||
+      !parseResult.success ||
+      !parseResult.data
+    ) {
+      setIdlMatch(null);
+      return;
+    }
+
+    const data = parseResult.data as ParsedStruct | ParsedMessage | null;
+    if (!data) {
+      setIdlMatch(null);
+      return;
+    }
+
+    const match = matchParseResultToSchema(data, idlSchema);
+    setIdlMatch(match);
+  }, [useIdl, idlSchema, parseResult]);
 
   return (
     <div className='flex flex-col h-screen bg-gray-100'>
@@ -96,7 +203,10 @@ function App() {
             onChange={handleInputChange}
             format={inputFormat}
             onFormatChange={setInputFormat}
-            onParse={handleParse}
+            onIdlLoad={handleIdlLoad}
+            onIdlClear={handleIdlClear}
+            idlFileName={idlSource?.name}
+            idlError={idlError}
           />
         </div>
         <div
@@ -110,7 +220,21 @@ function App() {
           tabIndex={0}
         />
         <div className='h-full' style={{ width: rightWidth }}>
-          <OutputPane result={parseResult} buffer={buffer} />
+          <OutputPane
+            result={parseResult}
+            buffer={buffer}
+            idlAvailable={Boolean(idlSchema)}
+            useIdl={useIdl && Boolean(idlSchema)}
+            onToggleIdl={(value) => {
+              if (!idlSchema) {
+                setUseIdl(false);
+                return;
+              }
+              setUseIdl(value);
+            }}
+            idlMatch={useIdl ? idlMatch : null}
+            idlFileName={idlSource?.name}
+          />
         </div>
       </div>
     </div>

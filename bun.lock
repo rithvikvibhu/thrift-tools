@@ -5,6 +5,7 @@
       "name": "vite-react-typescript-starter",
       "dependencies": {
         "@base-ui-components/react": "^1.0.0-beta.6",
+        "@creditkarma/thrift-parser": "^2.0.0",
         "lucide-react": "^0.344.0",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
@@ -73,6 +74,8 @@
     "@base-ui-components/react": ["@base-ui-components/react@1.0.0-beta.6", "", { "dependencies": { "@babel/runtime": "^7.28.4", "@base-ui-components/utils": "0.2.0", "@floating-ui/react-dom": "^2.1.6", "@floating-ui/utils": "^0.2.10", "reselect": "^5.1.1", "tabbable": "^6.3.0", "use-sync-external-store": "^1.6.0" }, "peerDependencies": { "@types/react": "^17 || ^18 || ^19", "react": "^17 || ^18 || ^19", "react-dom": "^17 || ^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-jE07DkS7JcGKGH4/hNPTabyGfEzrfDhGPM0h9exGDWwRhEJXZK9xhJ4m3fr+yPf8gpddOCMMoKyV4xITJKrSOA=="],
 
     "@base-ui-components/utils": ["@base-ui-components/utils@0.2.0", "", { "dependencies": { "@babel/runtime": "^7.28.4", "@floating-ui/utils": "^0.2.10", "reselect": "^5.1.1", "use-sync-external-store": "^1.6.0" }, "peerDependencies": { "@types/react": "^17 || ^18 || ^19", "react": "^17 || ^18 || ^19", "react-dom": "^17 || ^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-uLLsLpYxPVq/QNsrfHwXuI+uiCr8+P/SLtTgrA4hL5b4UmWo3dnhwo38edfu+gCgfblrJveDj1D4RxEvDc7RXw=="],
+
+    "@creditkarma/thrift-parser": ["@creditkarma/thrift-parser@2.0.0", "", { "bin": { "thrift-parser": "dist/main/bin/index.js" } }, "sha512-TnUXwCewfyDQikDqsJaI3t+wtJPDCCmx8r5FdK4ui2BlZJNQuemFww+Tp+VH9Kr/2+goUSuLG87mAOWzHKe7rw=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.21.5", "", { "os": "aix", "cpu": "ppc64" }, "sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ=="],
 

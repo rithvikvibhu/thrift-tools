@@ -1,13 +1,16 @@
-import { useState } from 'react';
 import { FileCode, Trash2 } from 'lucide-react';
 import { InputFormat } from '../utils/inputDecoder';
+import { IdlLoader, IdlPayload } from './IdlLoader';
 
 interface InputPaneProps {
   value: string;
   onChange: (value: string) => void;
   format: InputFormat;
   onFormatChange: (format: InputFormat) => void;
-  onParse: () => void;
+  onIdlLoad: (payload: IdlPayload) => void;
+  onIdlClear: () => void;
+  idlFileName?: string | null;
+  idlError?: string | null;
 }
 
 const SAMPLE_DATA = {
@@ -20,27 +23,17 @@ export function InputPane({
   onChange,
   format,
   onFormatChange,
-  onParse,
+  onIdlLoad,
+  onIdlClear,
+  idlFileName,
+  idlError,
 }: InputPaneProps) {
-  const [error, setError] = useState<string>('');
-
   const handleLoadSample = () => {
     onChange(SAMPLE_DATA[format]);
-    setError('');
   };
 
   const handleClear = () => {
     onChange('');
-    setError('');
-  };
-
-  const handleParse = () => {
-    if (!value.trim()) {
-      setError('Please enter some data to parse');
-      return;
-    }
-    setError('');
-    onParse();
   };
 
   return (
@@ -105,20 +98,13 @@ export function InputPane({
         />
       </div>
 
-      {error && (
-        <div className='px-4 py-2 bg-red-50 border-t border-red-200'>
-          <p className='text-sm text-red-700'>{error}</p>
-        </div>
-      )}
-
       <div className='p-4 border-t border-gray-200 bg-gray-50'>
-        <button
-          onClick={handleParse}
-          disabled={!value.trim()}
-          className='w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors'
-        >
-          Parse Thrift Binary
-        </button>
+        <IdlLoader
+          fileName={idlFileName}
+          error={idlError}
+          onLoad={onIdlLoad}
+          onClear={onIdlClear}
+        />
       </div>
     </div>
   );
