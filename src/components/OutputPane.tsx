@@ -10,7 +10,7 @@ import {
 import { ParseResult } from '../thrift/types';
 import { TreeView } from './TreeView';
 import { HexDump } from './HexDump';
-import { IdlMatchResult } from '../thrift/idlSchema';
+import { IdlMatchResult, StructMatchInfo } from '../thrift/idlSchema';
 
 interface OutputPaneProps {
   result: ParseResult | null;
@@ -20,6 +20,9 @@ interface OutputPaneProps {
   onToggleIdl: (value: boolean) => void;
   idlMatch: IdlMatchResult | null;
   idlFileName?: string | null;
+  selectedStructOverride: string | null;
+  onStructOverrideChange: (structName: string | null) => void;
+  structMatches: StructMatchInfo[];
 }
 
 type ViewMode = 'tree' | 'hex';
@@ -32,6 +35,9 @@ export function OutputPane({
   onToggleIdl,
   idlMatch,
   idlFileName,
+  selectedStructOverride,
+  onStructOverrideChange,
+  structMatches,
 }: OutputPaneProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
 
@@ -112,7 +118,7 @@ export function OutputPane({
       return (
         <div className='px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-600'>
           {idlFileName ? `IDL loaded (${idlFileName}).` : 'IDL loaded.'} Toggle
-          “Use IDL” to annotate fields.
+          "Use IDL" to annotate fields.
         </div>
       );
     }
@@ -126,26 +132,58 @@ export function OutputPane({
     }
 
     const structMatch = idlMatch?.structMatch;
-    if (!structMatch) {
-      return (
-        <div className='px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-700'>
-          No matching struct definition found in the loaded IDL.
-        </div>
-      );
-    }
-
-    const coverage = `${structMatch.matchedFields}/${structMatch.schemaFieldCount}`;
+    const hasStructs = structMatches.length > 0;
 
     return (
-      <div className='px-4 py-2 bg-blue-50 border-b border-blue-200 text-xs text-blue-800 flex flex-wrap items-center gap-2'>
-        Matched struct{' '}
-        <span className='font-semibold'>{structMatch.structName}</span>(
-        {coverage} fields)
-        {idlMatch?.context?.kind === 'message' && idlMatch.context.name && (
-          <span className='text-blue-700'>
-            from message “{idlMatch.context.name}”
-          </span>
-        )}
+      <div className='px-4 py-2 bg-blue-50 border-b border-blue-200'>
+        <div className='flex flex-wrap items-center gap-2 text-xs'>
+          {structMatch ? (
+            <>
+              <span className='text-blue-800'>
+                Matched struct{' '}
+                <span className='font-semibold'>{structMatch.structName}</span>{' '}
+                ({structMatch.matchedFields}/{structMatch.schemaFieldCount}{' '}
+                fields)
+              </span>
+              {idlMatch?.context?.kind === 'message' &&
+                idlMatch.context.name && (
+                  <span className='text-blue-700'>
+                    from message "{idlMatch.context.name}"
+                  </span>
+                )}
+            </>
+          ) : (
+            <span className='text-amber-700'>
+              No matching struct definition found in the loaded IDL.
+            </span>
+          )}
+          {hasStructs && (
+            <div className='ml-auto flex items-center gap-2'>
+              <label
+                htmlFor='struct-select'
+                className='text-blue-800 font-medium'
+              >
+                Override:
+              </label>
+              <select
+                id='struct-select'
+                value={selectedStructOverride || ''}
+                onChange={(e) => onStructOverrideChange(e.target.value || null)}
+                className='px-2 py-1 text-xs border border-blue-300 rounded bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              >
+                <option value=''>Auto-match</option>
+                {structMatches.map(({ structName, match }) => (
+                  <option key={structName} value={structName}>
+                    {structName}
+                    {match
+                      ? ` (${match.matchedFields}/${match.schemaFieldCount} fields, score: ${match.score})`
+                      : ' (no match)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
     );
   };

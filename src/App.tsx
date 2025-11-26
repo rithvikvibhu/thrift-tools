@@ -13,6 +13,8 @@ import {
   parseIdlSchema,
   matchParseResultToSchema,
   IdlMatchResult,
+  getAllStructMatches,
+  StructMatchInfo,
 } from './thrift/idlSchema';
 
 const IDL_STORAGE_KEY = 'thrift-tools:idl';
@@ -27,6 +29,10 @@ function App() {
   const [idlSchema, setIdlSchema] = useState<IdlSchema | null>(null);
   const [useIdl, setUseIdl] = useState<boolean>(false);
   const [idlMatch, setIdlMatch] = useState<IdlMatchResult | null>(null);
+  const [selectedStructOverride, setSelectedStructOverride] = useState<
+    string | null
+  >(null);
+  const [structMatches, setStructMatches] = useState<StructMatchInfo[]>([]);
   const {
     containerRef,
     splitRatio,
@@ -83,6 +89,7 @@ function App() {
       setUseIdl(false);
       setIdlMatch(null);
       setIdlError(null);
+      setSelectedStructOverride(null);
       if (typeof window !== 'undefined') {
         try {
           window.localStorage.removeItem(IDL_STORAGE_KEY);
@@ -99,6 +106,7 @@ function App() {
       setIdlSchema(parsed.schema);
       setUseIdl(true);
       setIdlError(null);
+      setSelectedStructOverride(null);
       if (typeof window !== 'undefined') {
         try {
           window.localStorage.setItem(IDL_STORAGE_KEY, JSON.stringify(payload));
@@ -111,6 +119,7 @@ function App() {
       setUseIdl(false);
       setIdlMatch(null);
       setIdlError(parsed.error);
+      setSelectedStructOverride(null);
       if (typeof window !== 'undefined') {
         try {
           window.localStorage.removeItem(IDL_STORAGE_KEY);
@@ -164,18 +173,37 @@ function App() {
       !parseResult.data
     ) {
       setIdlMatch(null);
+      setStructMatches([]);
       return;
     }
 
     const data = parseResult.data as ParsedStruct | ParsedMessage | null;
     if (!data) {
       setIdlMatch(null);
+      setStructMatches([]);
       return;
     }
 
-    const match = matchParseResultToSchema(data, idlSchema);
+    // Get the struct to match against (for messages, use the body)
+    const structToMatch =
+      data.type === 'message' ? data.body : (data as ParsedStruct);
+
+    if (structToMatch) {
+      // Get all struct matches for dropdown ordering
+      const allMatches = getAllStructMatches(structToMatch, idlSchema);
+      setStructMatches(allMatches);
+    } else {
+      setStructMatches([]);
+    }
+
+    // Get the actual match (using override if set)
+    const match = matchParseResultToSchema(
+      data,
+      idlSchema,
+      selectedStructOverride
+    );
     setIdlMatch(match);
-  }, [useIdl, idlSchema, parseResult]);
+  }, [useIdl, idlSchema, parseResult, selectedStructOverride]);
 
   return (
     <div className='flex flex-col h-screen bg-gray-100'>
@@ -234,6 +262,9 @@ function App() {
             }}
             idlMatch={useIdl ? idlMatch : null}
             idlFileName={idlSource?.name}
+            selectedStructOverride={selectedStructOverride}
+            onStructOverrideChange={setSelectedStructOverride}
+            structMatches={structMatches}
           />
         </div>
       </div>

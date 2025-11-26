@@ -94,7 +94,8 @@ export function parseIdlSchema(source: string): IdlSchemaParseResult {
 
 export function matchParseResultToSchema(
   data: ParsedStruct | ParsedMessage,
-  schema: IdlSchema
+  schema: IdlSchema,
+  overrideStructName?: string | null
 ): IdlMatchResult | null {
   if (!data) {
     return null;
@@ -102,7 +103,7 @@ export function matchParseResultToSchema(
 
   if (data.type === 'message') {
     const structMatch = data.body
-      ? matchStructToSchema(data.body, schema)
+      ? matchStructToSchema(data.body, schema, overrideStructName)
       : null;
     return {
       structMatch,
@@ -115,7 +116,7 @@ export function matchParseResultToSchema(
 
   if (data.type === 'struct') {
     return {
-      structMatch: matchStructToSchema(data, schema),
+      structMatch: matchStructToSchema(data, schema, overrideStructName),
       context: {
         kind: 'struct',
       },
@@ -127,8 +128,18 @@ export function matchParseResultToSchema(
 
 export function matchStructToSchema(
   struct: ParsedStruct,
-  schema: IdlSchema
+  schema: IdlSchema,
+  overrideStructName?: string | null
 ): MatchedStruct | null {
+  // If override is specified, use that struct directly
+  if (overrideStructName && schema.structs[overrideStructName]) {
+    const schemaStruct = schema.structs[overrideStructName];
+    return matchStructAgainstDefinition(struct, schemaStruct, schema, {
+      visited: new Set(),
+    });
+  }
+
+  // Otherwise, find the best match automatically
   let bestMatch: MatchedStruct | null = null;
 
   for (const structName of Object.keys(schema.structs)) {
@@ -147,6 +158,46 @@ export function matchStructToSchema(
   }
 
   return bestMatch;
+}
+
+export function getStructNames(schema: IdlSchema): string[] {
+  return Object.keys(schema.structs).sort();
+}
+
+export interface StructMatchInfo {
+  structName: string;
+  match: MatchedStruct | null;
+}
+
+export function getAllStructMatches(
+  struct: ParsedStruct,
+  schema: IdlSchema
+): StructMatchInfo[] {
+  const matches: StructMatchInfo[] = [];
+
+  for (const structName of Object.keys(schema.structs)) {
+    const schemaStruct = schema.structs[structName];
+    const match = matchStructAgainstDefinition(struct, schemaStruct, schema, {
+      visited: new Set(),
+    });
+
+    matches.push({
+      structName,
+      match: match && match.matchedFields > 0 ? match : null,
+    });
+  }
+
+  // Sort by: matches with scores first (highest score), then unmatched structs
+  matches.sort((a, b) => {
+    if (a.match && b.match) {
+      return b.match.score - a.match.score; // Higher score first
+    }
+    if (a.match) return -1; // Matches come before non-matches
+    if (b.match) return 1;
+    return a.structName.localeCompare(b.structName); // Alphabetical for non-matches
+  });
+
+  return matches;
 }
 
 function matchStructAgainstDefinition(
