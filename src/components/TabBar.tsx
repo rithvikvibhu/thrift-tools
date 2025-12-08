@@ -22,6 +22,12 @@ export function TabBar({
 }: TabBarProps) {
   const renameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // Detect platform for showing appropriate modifier key
+  const isMac =
+    typeof navigator !== 'undefined' &&
+    (navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac'));
+  const modifierKey = isMac ? '⌥' : 'Alt';
+
   useEffect(() => {
     if (renamingTabId) {
       const ref = renameInputRefs.current[renamingTabId];
@@ -79,7 +85,7 @@ export function TabBar({
                     event.stopPropagation();
                     onClose(tab.id);
                   }}
-                  className='text-lg leading-none text-gray-500 hover:text-red-600 hover:bg-gray-200 rounded px-2 py-1 transition-colors'
+                  className='text-lg leading-none text-gray-500 hover:text-red-600 hover:bg-gray-200 rounded px-2 py-0.5 transition-colors'
                   aria-label={`Close ${tab.name}`}
                 >
                   ×
@@ -94,7 +100,7 @@ export function TabBar({
         onClick={onAdd}
         className='px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-200 rounded bg-blue-50'
       >
-        + New Tab
+        + New Tab ({modifierKey}+T)
       </button>
     </div>
   );

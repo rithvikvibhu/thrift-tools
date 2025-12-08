@@ -297,19 +297,22 @@ function App() {
     setActiveTabId(nextId);
   };
 
-  const removeTab = (tabId: string) => {
-    setTabs((prevTabs) => {
-      if (prevTabs.length === 1) {
-        return prevTabs;
-      }
-      const filtered = prevTabs.filter((tab) => tab.id !== tabId);
-      if (activeTabId === tabId) {
-        const nextActive = filtered[filtered.length - 1];
-        setActiveTabId(nextActive.id);
-      }
-      return filtered;
-    });
-  };
+  const removeTab = useCallback(
+    (tabId: string) => {
+      setTabs((prevTabs) => {
+        if (prevTabs.length === 1) {
+          return prevTabs;
+        }
+        const filtered = prevTabs.filter((tab) => tab.id !== tabId);
+        if (activeTabId === tabId) {
+          const nextActive = filtered[filtered.length - 1];
+          setActiveTabId(nextActive.id);
+        }
+        return filtered;
+      });
+    },
+    [activeTabId]
+  );
 
   const renameTab = (tabId: string, name: string) => {
     updateTabById(tabId, (tab) => ({ ...tab, name }));
@@ -325,6 +328,64 @@ function App() {
     setActiveTabId(tabId);
     setRenamingTabId(withRename ? tabId : null);
   };
+
+  const switchToNextTab = useCallback(() => {
+    const currentIndex = tabs.findIndex((tab) => tab.id === activeTabId);
+    const nextIndex = (currentIndex + 1) % tabs.length;
+    setActiveTabId(tabs[nextIndex].id);
+  }, [tabs, activeTabId]);
+
+  const switchToPreviousTab = useCallback(() => {
+    const currentIndex = tabs.findIndex((tab) => tab.id === activeTabId);
+    const previousIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    setActiveTabId(tabs[previousIndex].id);
+  }, [tabs, activeTabId]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore shortcuts when renaming a tab
+      if (renamingTabId) return;
+
+      // Ignore shortcuts when typing in input fields
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Check for Alt key combinations
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        if (event.key === 't' || event.key === 'T') {
+          event.preventDefault();
+          addTab();
+        } else if (event.key === 'w' || event.key === 'W') {
+          event.preventDefault();
+          if (tabs.length > 1) {
+            removeTab(activeTabId);
+          }
+        } else if (event.key === ',') {
+          event.preventDefault();
+          switchToPreviousTab();
+        } else if (event.key === '.') {
+          event.preventDefault();
+          switchToNextTab();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [
+    renamingTabId,
+    tabs,
+    activeTabId,
+    removeTab,
+    switchToPreviousTab,
+    switchToNextTab,
+  ]);
 
   return (
     <div className='flex flex-col h-screen bg-gray-100'>
