@@ -341,6 +341,59 @@ function App() {
     setActiveTabId(tabs[previousIndex].id);
   }, [tabs, activeTabId]);
 
+  const hashInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || hashInitializedRef.current) {
+      return;
+    }
+
+    const hash = window.location.hash.slice(1);
+    if (!hash) {
+      hashInitializedRef.current = true;
+      return;
+    }
+
+    const params = new URLSearchParams(hash);
+    const formatParam = params.get('format');
+    const valueParam = params.get('value');
+
+    const explicitFormat =
+      formatParam === 'hex' || formatParam === 'base64'
+        ? formatParam
+        : undefined;
+
+    if (typeof valueParam === 'string' || explicitFormat) {
+      const tab = tabs.find((t) => t.id === activeTabId);
+      if (tab) {
+        parseInput(activeTabId, valueParam || tab.inputValue, explicitFormat);
+      }
+    }
+
+    hashInitializedRef.current = true;
+  }, [activeTabId, parseInput, tabs]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (!activeTab || !hashInitializedRef.current) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('format', activeTab.inputFormat);
+    if (activeTab.inputValue.trim()) {
+      params.set('value', activeTab.inputValue);
+    }
+    const newHash = params.toString();
+    const formattedHash = newHash ? `#${newHash}` : '';
+    if (window.location.hash !== formattedHash) {
+      window.location.hash = formattedHash;
+    }
+  }, [activeTab?.id, activeTab?.inputFormat, activeTab?.inputValue]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Ignore shortcuts when renaming a tab
