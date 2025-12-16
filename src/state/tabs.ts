@@ -24,7 +24,7 @@ export const createTab = (id: string, name: string): TabState => ({
   selectedStructOverride: null,
   structMatches: [],
   idlMatch: null,
-  useIdl: false,
+  useIdl: true,
 });
 
 export const updateTabList = (
@@ -32,4 +32,3 @@ export const updateTabList = (
   tabId: string,
   updater: (tab: TabState) => TabState
 ) => tabs.map((tab) => (tab.id === tabId ? updater(tab) : tab));
-
