@@ -10,6 +10,8 @@ type TabBarProps = {
   onClose: (tabId: string) => void;
   onAdd: () => void;
   onImport: (blobs: string[]) => void;
+  importModalOpen?: boolean;
+  onImportModalChange?: (open: boolean) => void;
 };
 
 function cleanBlob(s: string): string {
@@ -54,10 +56,15 @@ export function TabBar({
   onClose,
   onAdd,
   onImport,
+  importModalOpen,
+  onImportModalChange,
 }: TabBarProps) {
   const renameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const [showImportModal, setShowImportModal] = useState(false);
+  const [showImportModalInternal, setShowImportModalInternal] = useState(false);
   const [importText, setImportText] = useState('');
+
+  const showImportModal = importModalOpen ?? showImportModalInternal;
+  const setShowImportModal = onImportModalChange ?? setShowImportModalInternal;
 
   // Detect platform for showing appropriate modifier key
   const isMac =
@@ -72,6 +79,21 @@ export function TabBar({
       ref?.select();
     }
   }, [renamingTabId]);
+
+  // Close modal on ESC key press
+  useEffect(() => {
+    if (!showImportModal) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowImportModal(false);
+        setImportText('');
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showImportModal, setShowImportModal]);
 
   return (
     <div className='flex items-center gap-2 border-b border-gray-200 bg-white'>
@@ -144,12 +166,21 @@ export function TabBar({
         onClick={() => setShowImportModal(true)}
         className='px-3 py-1 text-sm font-medium text-green-600 hover:text-green-700 border border-green-200 rounded bg-green-50'
       >
-        Import
+        Import ({modifierKey}+I)
       </button>
 
       {showImportModal && (
-        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
-          <div className='bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]'>
+        <div
+          className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'
+          onClick={() => {
+            setShowImportModal(false);
+            setImportText('');
+          }}
+        >
+          <div
+            className='bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]'
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className='text-lg font-semibold mb-2'>
               Import Multiple Blobs
             </h2>

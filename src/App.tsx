@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Binary } from 'lucide-react';
+import { Binary, Keyboard } from 'lucide-react';
 import { InputPane } from './components/InputPane';
 import { OutputPane } from './components/OutputPane';
 import { TabBar } from './components/TabBar';
@@ -8,6 +8,7 @@ import { ThriftParser } from './thrift/parser';
 import { useHorizontalSplit } from './hooks/useHorizontalSplit';
 import { createTab, TabState, updateTabList } from './state/tabs';
 import { IdlPayload } from './components/IdlLoader';
+import { ShortcutsPopup } from './components/ShortcutsPopup';
 import {
   IdlSchema,
   parseIdlSchema,
@@ -28,6 +29,8 @@ function App() {
   });
   const [activeTabId, setActiveTabId] = useState<string>('tab-1');
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [idlSource, setIdlSource] = useState<IdlPayload | null>(null);
   const [idlError, setIdlError] = useState<string | null>(null);
   const [idlSchema, setIdlSchema] = useState<IdlSchema | null>(null);
@@ -441,7 +444,15 @@ function App() {
         } else if (event.key === '.') {
           event.preventDefault();
           switchToNextTab();
+        } else if (event.key === 'i' || event.key === 'I') {
+          event.preventDefault();
+          setShowImportModal(true);
         }
+      }
+
+      if (event.key === '?') {
+        event.preventDefault();
+        setShowShortcuts((prev) => !prev);
       }
     };
 
@@ -467,6 +478,13 @@ function App() {
               Schema-less Thrift protocol inspector
             </p>
           </div>
+          <button
+            onClick={() => setShowShortcuts(true)}
+            className='ml-auto p-2 hover:bg-white/10 rounded transition-colors'
+            title='Keyboard shortcuts (?)'
+          >
+            <Keyboard className='w-5 h-5' />
+          </button>
         </div>
       </header>
 
@@ -479,6 +497,8 @@ function App() {
         onClose={removeTab}
         onAdd={addTab}
         onImport={importBlobs}
+        importModalOpen={showImportModal}
+        onImportModalChange={setShowImportModal}
       />
 
       <div
@@ -526,6 +546,10 @@ function App() {
           />
         </div>
       </div>
+      <ShortcutsPopup
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+      />
     </div>
   );
 }
