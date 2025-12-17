@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { FileCode, Trash2 } from 'lucide-react';
 import { InputFormat } from '../utils/inputDecoder';
 import { IdlLoader, IdlPayload } from './IdlLoader';
@@ -28,13 +29,28 @@ export function InputPane({
   idlFileName,
   idlError,
 }: InputPaneProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const handleLoadSample = () => {
+    if (textareaRef.current) {
+      textareaRef.current.value = SAMPLE_DATA[format];
+    }
     onChange(SAMPLE_DATA[format]);
   };
 
   const handleClear = () => {
+    if (textareaRef.current) {
+      textareaRef.current.value = '';
+    }
     onChange('');
   };
+
+  // Sync external value changes to the uncontrolled textarea
+  useEffect(() => {
+    if (textareaRef.current && textareaRef.current.value !== value) {
+      textareaRef.current.value = value;
+    }
+  }, [value]);
 
   return (
     <div className='flex flex-col h-full bg-white border-r border-gray-200'>
@@ -88,8 +104,24 @@ export function InputPane({
 
       <div className='flex-1 p-4'>
         <textarea
-          value={value}
+          ref={textareaRef}
+          defaultValue={value}
           onChange={(e) => onChange(e.target.value)}
+          onPaste={(e) => {
+            const pastedText = e.clipboardData.getData('text');
+            const stripped = pastedText.replace(/^[\s,'"]+|[\s,'"]+$/g, '');
+            if (stripped !== pastedText) {
+              e.preventDefault();
+              const textarea = e.currentTarget;
+              textarea.setRangeText(
+                stripped,
+                textarea.selectionStart,
+                textarea.selectionEnd,
+                'end'
+              );
+              onChange(textarea.value);
+            }
+          }}
           placeholder={`Enter ${
             format === 'hex' ? 'hexadecimal' : 'base64'
           } encoded Thrift binary data...`}
