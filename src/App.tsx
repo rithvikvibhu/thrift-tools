@@ -297,6 +297,22 @@ function App() {
     setActiveTabId(nextId);
   };
 
+  const importBlobs = (blobs: string[]) => {
+    const newTabs = blobs.map((_, index) => {
+      const nextId = `tab-${tabIdCounter.current++}`;
+      return createTab(nextId, `Import ${index + 1}`);
+    });
+    setTabs((prev) => [...prev, ...newTabs]);
+    // Parse each blob into its tab
+    newTabs.forEach((tab, index) => {
+      parseInput(tab.id, blobs[index]);
+    });
+    // Activate the first imported tab
+    if (newTabs.length > 0) {
+      setActiveTabId(newTabs[0].id);
+    }
+  };
+
   const removeTab = useCallback(
     (tabId: string) => {
       setTabs((prevTabs) => {
@@ -462,6 +478,7 @@ function App() {
         onRename={renameTab}
         onClose={removeTab}
         onAdd={addTab}
+        onImport={importBlobs}
       />
 
       <div

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TabState } from '../state/tabs';
 
 type TabBarProps = {
@@ -9,7 +9,41 @@ type TabBarProps = {
   onRename: (tabId: string, name: string) => void;
   onClose: (tabId: string) => void;
   onAdd: () => void;
+  onImport: (blobs: string[]) => void;
 };
+
+function cleanBlob(s: string): string {
+  return s.replace(/^[\s,'"]+|[\s,'"]+$/g, '');
+}
+
+function parseImportInput(input: string): string[] {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+
+  // Try JSON array of strings
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === 'string')
+    ) {
+      return parsed.map(cleanBlob).filter(Boolean);
+    }
+  } catch {
+    // Not valid JSON, continue
+  }
+
+  // Try comma-separated (single line, no newlines)
+  if (!trimmed.includes('\n') && trimmed.includes(',')) {
+    const parts = trimmed.split(',').map(cleanBlob).filter(Boolean);
+    if (parts.length > 1) {
+      return parts;
+    }
+  }
+
+  // Default: newline-separated
+  return trimmed.split('\n').map(cleanBlob).filter(Boolean);
+}
 
 export function TabBar({
   tabs,
@@ -19,8 +53,11 @@ export function TabBar({
   onRename,
   onClose,
   onAdd,
+  onImport,
 }: TabBarProps) {
   const renameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState('');
 
   // Detect platform for showing appropriate modifier key
   const isMac =
@@ -102,6 +139,70 @@ export function TabBar({
       >
         + New Tab ({modifierKey}+T)
       </button>
+      <button
+        type='button'
+        onClick={() => setShowImportModal(true)}
+        className='px-3 py-1 text-sm font-medium text-green-600 hover:text-green-700 border border-green-200 rounded bg-green-50'
+      >
+        Import
+      </button>
+
+      {showImportModal && (
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
+          <div className='bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]'>
+            <h2 className='text-lg font-semibold mb-2'>
+              Import Multiple Blobs
+            </h2>
+            <p className='text-sm text-gray-600 mb-4'>
+              Paste your data below. Supported formats:
+            </p>
+            <ul className='text-sm text-gray-600 mb-4 list-disc list-inside'>
+              <li>
+                JSON array of strings:{' '}
+                <code className='bg-gray-100 px-1'>["blob1", "blob2"]</code>
+              </li>
+              <li>
+                Comma-separated values:{' '}
+                <code className='bg-gray-100 px-1'>blob1, blob2, blob3</code>
+              </li>
+              <li>One blob per line (default)</li>
+            </ul>
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder='Paste blobs here...'
+              className='w-full h-48 p-3 border border-gray-300 rounded font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500'
+              autoFocus
+            />
+            <div className='flex justify-end gap-2 mt-4'>
+              <button
+                type='button'
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportText('');
+                }}
+                className='px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded'
+              >
+                Cancel
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  const blobs = parseImportInput(importText);
+                  if (blobs.length > 0) {
+                    onImport(blobs);
+                  }
+                  setShowImportModal(false);
+                  setImportText('');
+                }}
+                className='px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded'
+              >
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
