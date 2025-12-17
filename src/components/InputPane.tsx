@@ -52,6 +52,19 @@ export function InputPane({
     }
   }, [value]);
 
+  // Use native input event to ensure changes are captured even after programmatic value sets
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const handleInput = () => {
+      onChange(textarea.value);
+    };
+
+    textarea.addEventListener('input', handleInput);
+    return () => textarea.removeEventListener('input', handleInput);
+  }, [onChange]);
+
   return (
     <div className='flex flex-col h-full bg-white border-r border-gray-200'>
       <div className='flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50'>
@@ -106,7 +119,6 @@ export function InputPane({
         <textarea
           ref={textareaRef}
           defaultValue={value}
-          onChange={(e) => onChange(e.target.value)}
           onPaste={(e) => {
             const pastedText = e.clipboardData.getData('text');
             const stripped = pastedText.replace(/^[\s,'"]+|[\s,'"]+$/g, '');
